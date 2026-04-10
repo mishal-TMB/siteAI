@@ -1,0 +1,105 @@
+для  датабейз .py
+def get_user_balance(user_id):
+    #Получение баланса пользователя
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return 0
+
+        cursor = conn.cursor()
+        cursor.execute('SELECT balance FROM users WHERE id = %s', (user_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result else 0
+    except Error as e:
+        print(f"Ошибка получения баланса: {e}")
+        return 0
+
+
+def update_balance(user_id, amount, transaction_type, description=''):
+    Обновление баланса и запись транзакции
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return False
+
+        cursor = conn.cursor()
+        # Обновляем баланс
+        cursor.execute('''
+        UPDATE users
+        SET balance = balance + %s
+        WHERE id = %s
+        ''', (amount, user_id))
+
+        # Записываем транзакцию
+        cursor.execute('''
+        INSERT INTO transactions (user_id, type, cost, description)
+        VALUES (%s, %s, %s, %s)
+        ''', (user_id, transaction_type, abs(amount), description))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Error as e:
+        print(f"Ошибка обновления баланса: {e}")
+        return False
+
+
+def get_user_transactions(user_id, limit=10):
+    """Получение истории транзакций"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return []
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute('''
+        SELECT * FROM transactions
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+        ''', (user_id, limit))
+        transactions = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return transactions
+    except Error as e:
+        print(f"Ошибка получения транзакций: {e}")
+        return []
+
+
+def get_all_users():
+    """Получение всех пользователей (для админки)"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return []
+
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute('SELECT id, name, login, balance, created_at FROM users ORDER BY created_at DESC')
+        users = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return users
+    except Error as e:
+        print(f"Ошибка получения пользователей: {e}")
+        return []
+
+def get_total_balance():
+    """Получение общего баланса всех пользователей"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return 0
+
+        cursor = conn.cursor()
+        cursor.execute('SELECT SUM(balance) FROM users')
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result[0] if result[0] else 0
+    except Error as e:
+        print(f"Ошибка получения общего баланса: {e}")
+        return 0
