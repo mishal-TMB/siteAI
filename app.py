@@ -5,7 +5,7 @@ import hashlib
 app = Flask(__name__)
 app.secret_key = 'secretkey123'
 
-# Создаем базу данных
+# Создаем бд
 init_db()
 
 
@@ -16,50 +16,18 @@ def index():
     return redirect(url_for('login'))
 
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        name = request.form['name']
-        login = request.form['login']
-        password = request.form['password']
-        confirm = request.form['confirm_password']
-
-        # Проверки
-        if password != confirm:
-            flash('Пароли не совпадают', 'danger')
-            return render_template('register.html')
-
-        # Хешируем пароль
-        hashed = hashlib.sha256(password.encode()).hexdigest()
-
-        # СОХРАНЯЕМ ПОЛЬЗОВАТЕЛЯ
-        user_id = add_user(name, login, hashed)
-
-        if user_id:
-            session['user_id'] = user_id
-            session['login'] = login
-            session['name'] = name
-            flash('Регистрация успешна!', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Логин уже существует', 'danger')
-
-    return render_template('register.html')
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        login = request.form['login']
-        password = request.form['password']
+        login = request.form.get('login', '').strip()
+        password = request.form.get('password', '')
 
-        hashed = hashlib.sha256(password.encode()).hexdigest()
-        user = authenticate_user(login, hashed)
+        user = authenticate_user(login, password)  
 
         if user:
             session['user_id'] = user['id']
-            session['login'] = user['login']
-            session['name'] = user['name']
+            session['login']   = user['username']
+            session['name']    = user.get('surname') or user['username']
             flash('Вход выполнен!', 'success')
             return redirect(url_for('dashboard'))
         else:
@@ -88,10 +56,10 @@ def buy():
     balance = get_user_balance(session['user_id'])
 
     if amount > balance:
-        flash('Недостаточно средств', 'danger')
+        flash('Ноумани', 'danger')
     else:
         update_balance(session['user_id'], -amount, 'purchase', f'Покупка на {amount} монет')
-        flash(f'Куплено на {amount} монет!', 'success')
+        flash(f'Куплено на {amount} бачей!', 'success')
 
     return redirect(url_for('dashboard'))
 
@@ -106,6 +74,40 @@ def add_funds():
 
     return redirect(url_for('dashboard'))
 
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('login', '').strip()
+        email    = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm  = request.form.get('confirm_password', '')
+        surname  = request.form.get('surname', '').strip()
+        lastname = request.form.get('lastname', '').strip() or None
+
+        if not username or not email or not password or not surname:
+            flash('Заполните все обязательные поля', 'danger')
+            return render_template('register.html')
+
+        if password != confirm:
+            flash('Пароли не совпадают', 'danger')
+            return render_template('register.html')
+
+        user_id = add_user(
+            username=username,
+            email=email,
+            password=password,
+            surname=surname,
+            lastname=lastname,
+        )
+
+        if user_id:
+            flash('Регистрация успешна, войдите', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('Логин или email уже заняты', 'danger')
+
+    return render_template('register.html')
 
 @app.route('/logout')
 def logout():

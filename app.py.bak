@@ -1,0 +1,141 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from database import *
+import hashlib
+
+app = Flask(__name__)
+app.secret_key = 'secretkey123'
+
+# Создаем бд
+init_db()
+
+
+@app.route('/')
+def index():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form['name']
+        login = request.form['login']
+        password = request.form['password']
+        confirm = request.form['confirm_password']
+        
+        if password != confirm:
+            flash('Пароли не совпадают', 'danger')
+            return render_template('register.html')
+
+        # Хеш пароля
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+
+    
+        user_id = add_user(name, login, hashed)
+
+        if user_id:
+            session['user_id'] = user_id
+            session['login'] = username
+            session['name'] = name
+            flash('Регистрация успешна!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Логин уже существует', 'danger')
+
+    return render_template('register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        login = request.form['login']
+        password = request.form['password']
+
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        user = authenticate_user(login, hashed)
+
+        if user:
+            session['user_id'] = user['id']
+            session['login'] = user['login']
+            session['name'] = user['name']
+            flash('Вход выполнен!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Неверный логин или пароль', 'danger')
+
+    return render_template('login.html')
+
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    balance = get_user_balance(session['user_id'])
+    transactions = get_user_transactions(session['user_id'])
+
+    return render_template('dashboard.html',
+                           name=session['name'],
+                           balance=balance,
+                           transactions=transactions)
+
+
+@app.route('/buy', methods=['POST'])
+def buy():
+    amount = int(request.form['amount'])
+    balance = get_user_balance(session['user_id'])
+
+    if amount > balance:
+        flash('Ноумани', 'danger')
+    else:
+        update_balance(session['user_id'], -amount, 'purchase', f'Покупка на {amount} монет')
+        flash(f'Куплено на {amount} бачей!', 'success')
+
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/add-funds', methods=['POST'])
+def add_funds():
+    amount = int(request.form['amount'])
+
+    if amount > 0:
+        update_balance(session['user_id'], amount, 'deposit', f'Пополнение на {amount} монет')
+        flash(f'Баланс пополнен на {amount} монет!', 'success')
+
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['login'].strip()
+        email    = request.form['email'].strip()
+        password = request.form['password']          # СЫРОЙ пароль
+        surname  = request.form['surname'].strip()
+        lastname = request.form.get('lastname', '').strip() or None
+
+        user_id = add_user(
+            username=username,
+            email=email,
+            password=password,
+            surname=surname,
+            lastname=lastname,
+        )
+
+        if user_id:
+            flash('Регистрация успешна, войдите', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('Не удалось зарегистрироваться (логин или email уже заняты)', 'danger')
+
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

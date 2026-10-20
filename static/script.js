@@ -1,7 +1,7 @@
 $(document).ready(function() {
     
     // Приветствие
-    alert('Добро пожаловать в ХерьAI!');
+     //alert('Добро пожаловать в ХерьAI!');
     
     // рега пользователя
     $('#registerForm').on('submit', function(e)
